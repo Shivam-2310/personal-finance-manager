@@ -6,6 +6,7 @@ import com.shivam.personal_finance_manager.entity.User;
 import com.shivam.personal_finance_manager.repository.UserRepository;
 import com.shivam.personal_finance_manager.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +40,24 @@ public class UserService {
         if (!optionalUser.isPresent() || !passwordEncoder.matches(loginDTO.getPassword(), optionalUser.get().getPassword())) {
             throw new Exception("Invalid email or password");
         }
-        return jwtUtil.generateToken(optionalUser.get().getEmail());
+        return jwtUtil.generateToken(optionalUser.get().getId());
     }
+
+
+    public UserDTO getProfile() throws Exception {
+        String email = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Optional<User> optionalUser = userRepository.findByEmail(email);
+
+        if (!optionalUser.isPresent()) {
+            throw new Exception("User not found");
+        }
+
+        User user = optionalUser.get();
+        UserDTO userDTO = new UserDTO();
+        userDTO.setName(user.getName());
+        userDTO.setEmail(user.getEmail());
+
+        return userDTO;
+    }
+
 }
