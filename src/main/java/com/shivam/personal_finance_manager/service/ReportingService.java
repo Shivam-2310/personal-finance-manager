@@ -29,11 +29,9 @@ public class ReportingService {
 
         Map<String, Object> report = new HashMap<>();
 
-        // Calculate total income and expenses
         BigDecimal totalIncome = calculateTotalByType(monthlyTransactions, TransactionType.CREDIT);
         BigDecimal totalExpenses = calculateTotalByType(monthlyTransactions, TransactionType.DEBIT);
 
-        // Category-wise breakdown
         Map<String, BigDecimal> categoryBreakdown = monthlyTransactions.stream()
                 .collect(Collectors.groupingBy(
                         Transaction::getCategory,
@@ -44,7 +42,6 @@ public class ReportingService {
                         )
                 ));
 
-        // Daily spending trend
         Map<LocalDate, BigDecimal> dailySpending = monthlyTransactions.stream()
                 .collect(Collectors.groupingBy(
                         Transaction::getDate,
@@ -65,9 +62,7 @@ public class ReportingService {
     }
 
     public Map<String, Object> generateYearlyReport(Long userId, int year) {
-        // Similar to monthly report but aggregated by month
-        // Implementation details...
-        return null; // TODO: Implement
+        return null;
     }
 
     private BigDecimal calculateTotalByType(List<Transaction> transactions, TransactionType type) {
