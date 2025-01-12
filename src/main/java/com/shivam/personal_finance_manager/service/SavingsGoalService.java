@@ -4,65 +4,33 @@ import com.shivam.personal_finance_manager.dto.SavingsGoalDTO;
 import com.shivam.personal_finance_manager.entity.SavingsGoal;
 import com.shivam.personal_finance_manager.entity.Transaction;
 import com.shivam.personal_finance_manager.entity.User;
+import com.shivam.personal_finance_manager.exception.ResourceNotFoundException;
 import com.shivam.personal_finance_manager.repository.SavingsGoalRepository;
+import com.shivam.personal_finance_manager.repository.TransactionRepository;
 import com.shivam.personal_finance_manager.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class SavingsGoalService {
-
     private final SavingsGoalRepository savingsGoalRepository;
     private final UserRepository userRepository;
+    private final TransactionRepository transactionRepository;
 
-    public SavingsGoalService(SavingsGoalRepository savingsGoalRepository, UserRepository userRepository) {
+    public SavingsGoalService(SavingsGoalRepository savingsGoalRepository,
+                              UserRepository userRepository,
+                              TransactionRepository transactionRepository) {
         this.savingsGoalRepository = savingsGoalRepository;
         this.userRepository = userRepository;
-    }
-
-    public SavingsGoalDTO createSavingsGoal(SavingsGoalDTO savingsGoalDTO, Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        SavingsGoal savingsGoal = convertToEntity(savingsGoalDTO);
-        savingsGoal.setUser(user);
-        savingsGoal.setCurrentAmount(BigDecimal.ZERO);
-        SavingsGoal savedGoal = savingsGoalRepository.save(savingsGoal);
-        return convertToDTO(savedGoal);
-    }
-
-    public List<SavingsGoalDTO> getSavingsGoalsByUser(Long userId) {
-        return savingsGoalRepository.findByUserId(userId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    public SavingsGoalDTO updateSavingsGoal(Long goalId, SavingsGoalDTO updatedGoalDTO) {
-        SavingsGoal existingGoal = savingsGoalRepository.findById(goalId)
-                .orElseThrow(() -> new IllegalArgumentException("Savings goal not found"));
-
-        existingGoal.setName(updatedGoalDTO.getName());
-        existingGoal.setTargetAmount(updatedGoalDTO.getTargetAmount());
-        existingGoal.setTargetDate(updatedGoalDTO.getTargetDate());
-
-        SavingsGoal savedGoal = savingsGoalRepository.save(existingGoal);
-        return convertToDTO(savedGoal);
-    }
-
-    public void deleteSavingsGoal(Long goalId) {
-        savingsGoalRepository.deleteById(goalId);
-    }
-
-    public void updateGoalProgress(Transaction transaction) {
-        List<SavingsGoal> userGoals = savingsGoalRepository.findByUserId(transaction.getUser().getId());
-        for (SavingsGoal goal : userGoals) {
-            if (transaction.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-                goal.setCurrentAmount(goal.getCurrentAmount().add(transaction.getAmount()));
-                savingsGoalRepository.save(goal);
-            }
-        }
+        this.transactionRepository = transactionRepository;
     }
 
     private SavingsGoalDTO convertToDTO(SavingsGoal savingsGoal) {
@@ -72,14 +40,84 @@ public class SavingsGoalService {
         dto.setTargetAmount(savingsGoal.getTargetAmount());
         dto.setTargetDate(savingsGoal.getTargetDate());
         dto.setCurrentAmount(savingsGoal.getCurrentAmount());
+        dto.setMonthlyTarget(savingsGoal.getMonthlyTarget());
+        dto.setStartDate(savingsGoal.getStartDate());
+        dto.setTrackAllSavings(savingsGoal.isTrackAllSavings());
+        dto.setTrackedCategories(savingsGoal.getTrackedCategories());
         return dto;
     }
 
-    private SavingsGoal convertToEntity(SavingsGoalDTO dto) {
-        SavingsGoal entity = new SavingsGoal();
-        entity.setName(dto.getName());
-        entity.setTargetAmount(dto.getTargetAmount());
-        entity.setTargetDate(dto.getTargetDate());
-        return entity;
+    public SavingsGoalDTO createSavingsGoal(SavingsGoalDTO dto, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        SavingsGoal goal = new SavingsGoal();
+        goal.setName(dto.getName());
+        goal.setTargetAmount(dto.getTargetAmount());
+        goal.setTargetDate(dto.getTargetDate());
+        goal.setStartDate(LocalDate.now());
+        goal.setUser(user);
+        goal.setTrackAllSavings(dto.isTrackAllSavings());
+        goal.setTrackedCategories(dto.getTrackedCategories());
+
+        // Calculate monthly target
+        long totalMonths = ChronoUnit.MONTHS.between(goal.getStartDate(), goal.getTargetDate());
+        if (totalMonths <= 0) {
+            throw new IllegalArgumentException("Target date must be in the future");
+        }
+        goal.setMonthlyTarget(goal.getTargetAmount().divide(BigDecimal.valueOf(totalMonths), 2, RoundingMode.HALF_UP));
+
+        SavingsGoal savedGoal = savingsGoalRepository.save(goal);
+        return convertToDTO(savedGoal);
+    }
+
+    public void updateGoalProgress(Transaction transaction) {
+        List<SavingsGoal> userGoals = savingsGoalRepository.findByUserId(transaction.getUser().getId());
+
+        for (SavingsGoal goal : userGoals) {
+            if (shouldCountTransactionForGoal(transaction, goal)) {
+                updateGoalAmount(goal, transaction.getAmount());
+            }
+        }
+    }
+
+    private boolean shouldCountTransactionForGoal(Transaction transaction, SavingsGoal goal) {
+        if (goal.isTrackAllSavings()) {
+            return transaction.getAmount().compareTo(BigDecimal.ZERO) > 0;
+        }
+        return goal.getTrackedCategories().contains(transaction.getCategory()) &&
+                transaction.getAmount().compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private void updateGoalAmount(SavingsGoal goal, BigDecimal amount) {
+        goal.setCurrentAmount(goal.getCurrentAmount().add(amount));
+        savingsGoalRepository.save(goal);
+    }
+
+    public SavingsGoalDTO getGoalProgress(Long goalId) {
+        SavingsGoal goal = savingsGoalRepository.findById(goalId)
+                .orElseThrow(() -> new ResourceNotFoundException("Savings goal not found"));
+
+        SavingsGoalDTO dto = convertToDTO(goal);
+
+        // Calculate progress percentage
+        double progressPercentage = goal.getCurrentAmount()
+                .divide(goal.getTargetAmount(), 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .doubleValue();
+        dto.setProgressPercentage(progressPercentage);
+
+        // Calculate if on track
+        long monthsElapsed = ChronoUnit.MONTHS.between(goal.getStartDate(), LocalDate.now());
+        BigDecimal expectedProgress = goal.getMonthlyTarget().multiply(BigDecimal.valueOf(monthsElapsed));
+        dto.setOnTrack(goal.getCurrentAmount().compareTo(expectedProgress) >= 0);
+
+        return dto;
+    }
+
+    public List<SavingsGoalDTO> getSavingsGoalsByUser(Long userId) {
+        return savingsGoalRepository.findByUserId(userId).stream()
+                .map(goal -> getGoalProgress(goal.getId()))
+                .collect(Collectors.toList());
     }
 }
