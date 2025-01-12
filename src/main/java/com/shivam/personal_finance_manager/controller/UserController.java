@@ -36,15 +36,13 @@ public class UserController {
         }
     }
 
-    @GetMapping("/profile")
-    public ResponseEntity<?> getProfile() {
+    @GetMapping("/profile/{userId}")
+    public ResponseEntity<?> getProfile(@PathVariable Long userId) {
         try {
-            UserDTO userProfile = userService.getProfile();
+            UserDTO userProfile = userService.getProfile(userId);
             return ResponseEntity.ok(userProfile);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-
-
 }

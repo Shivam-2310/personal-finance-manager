@@ -44,20 +44,16 @@ public class UserService {
     }
 
 
-    public UserDTO getProfile() throws Exception {
-        String email = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        Optional<User> optionalUser = userRepository.findByEmail(email);
+    public UserDTO getProfile(Long userId) throws Exception {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new Exception("User not found"));
 
-        if (!optionalUser.isPresent()) {
-            throw new Exception("User not found");
-        }
-
-        User user = optionalUser.get();
         UserDTO userDTO = new UserDTO();
         userDTO.setName(user.getName());
         userDTO.setEmail(user.getEmail());
 
         return userDTO;
     }
+
 
 }
