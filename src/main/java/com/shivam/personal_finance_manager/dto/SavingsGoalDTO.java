@@ -15,8 +15,8 @@ public class SavingsGoalDTO {
     private LocalDate startDate;
     private boolean trackAllSavings;
     private Set<String> trackedCategories;
-    private double progressPercentage;  // New field for progress tracking
-    private boolean isOnTrack;  // New field to indicate if saving is on track
+    private double progressPercentage;
+    private boolean isOnTrack;
 
     public Long getId() {
         return id;

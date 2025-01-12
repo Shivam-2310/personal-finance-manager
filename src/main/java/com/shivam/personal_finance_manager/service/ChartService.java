@@ -28,9 +28,9 @@ public class ChartService {
         return ChartFactory.createPieChart(
                 "Spending by Category",
                 dataset,
-                true,  // legend
-                true,  // tooltips
-                false  // urls
+                true,
+                true,
+                false
         );
     }
 
