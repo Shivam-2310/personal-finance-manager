@@ -23,7 +23,13 @@ public class SavingsGoalController {
     public ResponseEntity<SavingsGoalDTO> createSavingsGoal(
             @PathVariable Long userId,
             @Valid @RequestBody SavingsGoalDTO savingsGoalDTO) {
-        return ResponseEntity.ok(savingsGoalService.createSavingsGoal(savingsGoalDTO, userId));
+        try {
+            SavingsGoalDTO createdGoal = savingsGoalService.createSavingsGoal(savingsGoalDTO, userId);
+            return ResponseEntity.ok(createdGoal);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     @GetMapping("/{goalId}/progress")

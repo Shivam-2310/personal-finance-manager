@@ -6,6 +6,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+
 @Data
 @Entity
 @Table(name = "transactions")
@@ -17,6 +18,10 @@ public class Transaction {
 
     @Column(nullable = false)
     private BigDecimal amount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TransactionType type;
 
     @Column(nullable = false)
     private LocalDate date;
@@ -32,6 +37,11 @@ public class Transaction {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    public BigDecimal getSignedAmount() {
+        return type == TransactionType.DEBIT ? amount.negate() : amount;
+    }
+
+
     public Long getId() {
         return id;
     }
@@ -46,6 +56,14 @@ public class Transaction {
 
     public void setAmount(BigDecimal amount) {
         this.amount = amount;
+    }
+
+    public TransactionType getType() {
+        return type;
+    }
+
+    public void setType(TransactionType type) {
+        this.type = type;
     }
 
     public LocalDate getDate() {

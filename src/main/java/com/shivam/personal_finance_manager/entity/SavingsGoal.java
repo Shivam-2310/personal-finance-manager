@@ -8,7 +8,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "savings_goals")
+@Table(name = "SAVINGS_GOALS")
 public class SavingsGoal {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -17,29 +17,34 @@ public class SavingsGoal {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
+    @Column(name = "TARGET_AMOUNT", nullable = false)
     private BigDecimal targetAmount;
 
-    @Column(nullable = false)
+    @Column(name = "TARGET_DATE", nullable = false)
     private LocalDate targetDate;
 
-    @Column(nullable = false)
+    @Column(name = "CURRENT_AMOUNT", nullable = false)
     private BigDecimal currentAmount = BigDecimal.ZERO;
 
-    @Column(nullable = false)
+    @Column(name = "MONTHLY_TARGET", nullable = false)
     private BigDecimal monthlyTarget;
 
-    @Column(nullable = false)
+    @Column(name = "START_DATE", nullable = false)
     private LocalDate startDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "USER_ID", nullable = false)
     private User user;
 
-    @Column(nullable = false)
+    @Column(name = "TRACK_ALL_SAVINGS", nullable = false)
     private boolean trackAllSavings = true;
 
     @ElementCollection
+    @CollectionTable(
+            name = "SAVINGS_GOAL_TRACKED",
+            joinColumns = @JoinColumn(name = "SAVINGS_GOAL_ID")
+    )
+    @Column(name = "TRACKED_CATEGORIES")
     private Set<String> trackedCategories = new HashSet<>();
 
     public Long getId() {

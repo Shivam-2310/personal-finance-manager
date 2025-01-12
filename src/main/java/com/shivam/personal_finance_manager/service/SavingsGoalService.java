@@ -3,6 +3,7 @@ package com.shivam.personal_finance_manager.service;
 import com.shivam.personal_finance_manager.dto.SavingsGoalDTO;
 import com.shivam.personal_finance_manager.entity.SavingsGoal;
 import com.shivam.personal_finance_manager.entity.Transaction;
+import com.shivam.personal_finance_manager.entity.TransactionType;
 import com.shivam.personal_finance_manager.entity.User;
 import com.shivam.personal_finance_manager.exception.ResourceNotFoundException;
 import com.shivam.personal_finance_manager.repository.SavingsGoalRepository;
@@ -60,7 +61,6 @@ public class SavingsGoalService {
         goal.setTrackAllSavings(dto.isTrackAllSavings());
         goal.setTrackedCategories(dto.getTrackedCategories());
 
-        // Calculate monthly target
         long totalMonths = ChronoUnit.MONTHS.between(goal.getStartDate(), goal.getTargetDate());
         if (totalMonths <= 0) {
             throw new IllegalArgumentException("Target date must be in the future");
@@ -76,23 +76,30 @@ public class SavingsGoalService {
 
         for (SavingsGoal goal : userGoals) {
             if (shouldCountTransactionForGoal(transaction, goal)) {
-                updateGoalAmount(goal, transaction.getAmount());
+                BigDecimal signedAmount = transaction.getType() == TransactionType.CREDIT ?
+                        transaction.getAmount() :
+                        transaction.getAmount().negate();
+                updateGoalAmount(goal, signedAmount);
             }
         }
     }
 
     private boolean shouldCountTransactionForGoal(Transaction transaction, SavingsGoal goal) {
         if (goal.isTrackAllSavings()) {
-            return transaction.getAmount().compareTo(BigDecimal.ZERO) > 0;
+            return true;
         }
-        return goal.getTrackedCategories().contains(transaction.getCategory()) &&
-                transaction.getAmount().compareTo(BigDecimal.ZERO) > 0;
+        return goal.getTrackedCategories().contains(transaction.getCategory());
     }
+
 
     private void updateGoalAmount(SavingsGoal goal, BigDecimal amount) {
         goal.setCurrentAmount(goal.getCurrentAmount().add(amount));
+        if (goal.getCurrentAmount().compareTo(BigDecimal.ZERO) < 0) {
+            goal.setCurrentAmount(BigDecimal.ZERO);
+        }
         savingsGoalRepository.save(goal);
     }
+
 
     public SavingsGoalDTO getGoalProgress(Long goalId) {
         SavingsGoal goal = savingsGoalRepository.findById(goalId)
@@ -100,14 +107,12 @@ public class SavingsGoalService {
 
         SavingsGoalDTO dto = convertToDTO(goal);
 
-        // Calculate progress percentage
         double progressPercentage = goal.getCurrentAmount()
                 .divide(goal.getTargetAmount(), 4, RoundingMode.HALF_UP)
                 .multiply(BigDecimal.valueOf(100))
                 .doubleValue();
         dto.setProgressPercentage(progressPercentage);
 
-        // Calculate if on track
         long monthsElapsed = ChronoUnit.MONTHS.between(goal.getStartDate(), LocalDate.now());
         BigDecimal expectedProgress = goal.getMonthlyTarget().multiply(BigDecimal.valueOf(monthsElapsed));
         dto.setOnTrack(goal.getCurrentAmount().compareTo(expectedProgress) >= 0);
