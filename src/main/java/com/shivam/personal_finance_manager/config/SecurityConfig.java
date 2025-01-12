@@ -23,6 +23,7 @@ public class SecurityConfig {
         http
                 .authorizeRequests()
                 .requestMatchers("/api/users/register", "/api/users/login", "/h2-console/**").permitAll()
+                .requestMatchers("/api/reports/**").authenticated()  // Allow authenticated access to reports
                 .anyRequest().authenticated()
                 .and()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
